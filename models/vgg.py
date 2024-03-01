@@ -40,8 +40,7 @@ class VGGDecoder(nn.Module):
                 nn.init.normal_(layer.bias, mean = 0, std = 0.01)
 
     def forward(self, x):
-        ### Feature Map Size Will be (512, 64, 64) if Input Image is (512, 512)
-        assert x.shape[1:] == (512, 28, 28), "Feature Map Size Does Not Match (512, 28, 28)"
+        assert x.shape[1:] == (512, 32, 32), x.shape
         x = self.model(x)
         return x
     
@@ -54,6 +53,8 @@ class VGGEncoder(nn.Module):
         self.add_bn = add_bn
         self.model = self.load_freeze_vgg()
     
+    ### Encoder의 출력 결과와 Decoder의 출력이 Encoder를 다시 통과한 결과를 이용해 Loss를 계산하기 때문에
+    ### Encoder 모델은 업데이트가 이뤄지지 않아야 함
     def load_freeze_vgg(self):
         ### From Paper, Pretrained Encoder Uses Layers Down to ReLU 4-1
         if self.add_bn:
@@ -69,6 +70,7 @@ class VGGEncoder(nn.Module):
         
         return model
 
+    ### Encoder와 Decoder 모두 Reflection Padding을 사용
     def convert_padding_mode(self, model):
         for layer in model:
             if isinstance(layer, nn.Conv2d):
@@ -78,17 +80,6 @@ class VGGEncoder(nn.Module):
         return model
     
     def forward(self, x):
-        assert x.shape[1:] == (3, 224, 224), "Image Size Does Not Match (3, 224, 224)"
+        assert x.shape[1:] == (3, 256, 256)
         out = self.model(x)
         return out
-
-if __name__ == "__main__":
-    input_tensor = torch.rand((1, 3, 224, 224))
-    
-    encoder = VGGEncoder(add_bn = False)
-    decoder = VGGDecoder(add_bn = False)
-    
-    out = encoder(input_tensor)
-    breakpoint()
-    out = decoder(out)
-    breakpoint()

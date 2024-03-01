@@ -3,7 +3,7 @@ from torch.utils.data import Dataset
 from PIL import Image
 
 class ImageDataset(Dataset):
-    def __init__(self, data_type, transform, root = "./trainingdata"):
+    def __init__(self, data_type, transform, root = "./dataset"):
         self.data_path = os.path.join(root, data_type)
         self.transform = transform
         self.images = self.load_data()
