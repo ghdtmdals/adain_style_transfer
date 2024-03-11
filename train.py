@@ -28,9 +28,11 @@ class Train:
 
     def load_data(self, batch_size, n_workers):
         transform = transforms.Compose([
-            transforms.Resize((256, 256)), ### Image Size from Paper
+            # transforms.Resize((256, 256)), ### Image Size from Paper
+            transforms.Resize((512, 512)),
+            transforms.RandomCrop(256),
             transforms.ToTensor(),
-            transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)), ### ImageNet Mean / Std
+            # transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)), ### ImageNet Mean / Std
         ])
 
         content_dataset = ImageDataset(data_type = "train_content_images", transform = transform)
@@ -102,12 +104,12 @@ class Train:
             loss.backward()
             optimizer.step()
         
-            if i % 100 == 0:
+            if (i + 1) % 100 == 0:
                 avg_loss = running_loss / n_iter
                 avg_content_loss = running_content_loss / n_iter
                 avg_style_loss = running_style_loss / n_iter
                 
-                content = "Iter: %d | Avg Loss: %.4f | Avg Content Loss: %.4f | Avg Style Loss: %.4f" % (i, avg_loss, avg_content_loss, avg_style_loss)
+                content = "Iter: %d | Avg Loss: %.4f | Avg Content Loss: %.4f | Avg Style Loss: %.4f" % ((i + 1), avg_loss, avg_content_loss, avg_style_loss)
                 print("\r{}".format(content), end = "")
 
                 running_loss = 0
@@ -115,9 +117,10 @@ class Train:
                 running_style_loss = 0
                 n_iter = 0
 
-                torch.save({"model_state_dict": model.state_dict()},
-                        "./checkpoints/last_model.pt")
+        torch.save({"model_state_dict": model.state_dict()},
+                f"./checkpoints/last_model_trained_{i}.pt")
+        print("")
 
 if __name__ == "__main__":
-    train = Train(style_weight = 0.7, batch_size = 8, max_iter = 20000, learning_rate = 1e-4)
+    train = Train(style_weight = 0.7, batch_size = 8, max_iter = 40000, learning_rate = 1e-4, n_workers = 4)
     train.training_loop()

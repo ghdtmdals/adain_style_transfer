@@ -52,13 +52,15 @@ class AdaINTransfer(nn.Module):
 
         return [relu1_1, relu2_1, relu3_1, relu4_1]
     
-    def style_transfer(self, content, style):
+    def style_transfer(self, content, style, alpha = 1.0):
         ### Encode
         content = self.encoder(content)
         style = self.encoder(style)
 
         ### AdaIN
         style_adapted = self.adain(content, style)
+
+        weighted = style_adapted * alpha + content * (1 - alpha)
 
         ### Decode
         output = self.decoder(style_adapted)
