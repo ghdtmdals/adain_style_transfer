@@ -1,4 +1,3 @@
-import torch
 from torch import nn
 import torchvision.models as models
 
@@ -20,10 +19,15 @@ class VGGDecoder(nn.Module):
         for config in vgg19_reverse_config:
             if isinstance(config, int):
                 ### 일반 Padding 대신 Reflection Padding 사용
-                layers.append(nn.Conv2d(initial_dim, config, kernel_size = (3, 3), stride = 1, padding = 1, padding_mode = "reflect"))
+                layers.append(nn.ReflectionPad2d((1, 1, 1, 1)))
+                layers.append(nn.Conv2d(initial_dim, config, kernel_size = (3, 3), stride = 1))
+                
                 if self.add_bn:
                     layers.append(nn.BatchNorm2d(config))
-                layers.append(nn.ReLU())
+                
+                if config != vgg19_reverse_config[-1]:
+                    layers.append(nn.ReLU())
+
                 initial_dim = config
 
             elif config == 'u':
@@ -40,7 +44,6 @@ class VGGDecoder(nn.Module):
                 nn.init.normal_(layer.bias, mean = 0, std = 0.01)
 
     def forward(self, x):
-        assert x.shape[1:] == (512, 32, 32), x.shape
         x = self.model(x)
         return x
     
@@ -63,6 +66,7 @@ class VGGEncoder(nn.Module):
             model = models.vgg19(weights = models.VGG19_Weights.DEFAULT).features[:21]
         
         model = self.convert_padding_mode(model)
+        model = self.convert_to_ceil(model)
 
         ### Freeze Parameters
         for param in model.parameters():
@@ -76,10 +80,19 @@ class VGGEncoder(nn.Module):
             if isinstance(layer, nn.Conv2d):
                 ### Reflection Padding으로 변경
                 layer.padding_mode = "reflect"
+                layer.padding = (1, 1, 1, 1)
+
+        return model
+    
+    def convert_to_ceil(self, model):
+        for layer in model:
+            if isinstance(layer, nn.MaxPool2d):
+                layer.ceil_mode = True
 
         return model
     
     def forward(self, x):
         assert x.shape[1:] == (3, 256, 256)
         out = self.model(x)
+        
         return out

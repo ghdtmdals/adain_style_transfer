@@ -6,20 +6,22 @@ from models.adain_sf import AdaINTransfer
 from torchvision import transforms
 from torch.utils.data import DataLoader
 from data.dataset import ImageDataset
-from utils.sampler import InfiniteSamplerWrapper
-from utils.utils import get_mean_std
 
+from utils.sampler import InfiniteSamplerWrapper
+from utils.utils import get_mean_std, adjust_learning_rate
 from tqdm import tqdm
 
 ### 아래 주소의 코드를 참고하였음
 ### https://github.com/naoto0804/pytorch-AdaIN
 
 class Train:
-    def __init__(self, style_weight, batch_size, max_iter, learning_rate, n_workers = 0):
+    def __init__(self, content_weight, style_weight, batch_size, max_iter, learning_rate, lr_decay, n_workers = 0):
         self.style_weight = style_weight
+        self.content_weight = content_weight
         
         self.max_iter = max_iter
         self.learning_rate = learning_rate
+        self.lr_decay = lr_decay
         
         self.batch_size = batch_size
         self.n_workers = n_workers
@@ -46,7 +48,7 @@ class Train:
         return content_dataloader, style_dataloader
 
     def training_setup(self):
-        model = AdaINTransfer(add_bn = False).to(self.device)
+        model = AdaINTransfer(add_bn = True).to(self.device)
 
         criterion = nn.MSELoss()
 
@@ -85,6 +87,7 @@ class Train:
         model.train()
         print("Start Training for %d Iterations" % self.max_iter)
         for i in range(self.max_iter):
+            adjust_learning_rate(optimizer = optimizer, iteration_count = i, learning_rate = self.learning_rate, lr_decay = self.lr_decay)
             content_images = next(content_dataloader).to(self.device)
             style_images = next(style_dataloader).to(self.device)
 
@@ -93,7 +96,7 @@ class Train:
             content_loss = self.content_criterion(multiscale_outputs[-1], t, criterion)
             style_loss = self.style_criterion(multiscale_outputs, multiscale_style, criterion)
 
-            loss = content_loss + (self.style_weight * style_loss)
+            loss = (self.content_weight * content_loss) + (self.style_weight * style_loss)
 
             running_loss += loss.item()
             running_content_loss += content_loss.item()
@@ -104,12 +107,12 @@ class Train:
             loss.backward()
             optimizer.step()
         
-            if (i + 1) % 100 == 0:
+            if i % 100 == 0:
                 avg_loss = running_loss / n_iter
                 avg_content_loss = running_content_loss / n_iter
                 avg_style_loss = running_style_loss / n_iter
                 
-                content = "Iter: %d | Avg Loss: %.4f | Avg Content Loss: %.4f | Avg Style Loss: %.4f" % ((i + 1), avg_loss, avg_content_loss, avg_style_loss)
+                content = f"Iter: {i} | Avg Loss: {avg_loss:.4f} | Avg Content Loss: {avg_content_loss:.4f} | Avg Style Loss: {avg_style_loss:.4f} | lr: {optimizer.param_groups[0]['lr']}"
                 print("\r{}".format(content), end = "")
 
                 running_loss = 0
@@ -122,5 +125,5 @@ class Train:
         print("")
 
 if __name__ == "__main__":
-    train = Train(style_weight = 0.7, batch_size = 8, max_iter = 40000, learning_rate = 1e-4, n_workers = 4)
+    train = Train(content_weight = 1.0, style_weight = 10.0, batch_size = 8, max_iter = 160000, learning_rate = 1e-4, lr_decay = 5e-5, n_workers = 4)
     train.training_loop()
