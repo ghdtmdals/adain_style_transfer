@@ -120,7 +120,7 @@ class Train:
                 running_style_loss = 0
                 n_iter = 0
 
-        torch.save({"model_state_dict": model.state_dict()},
+        torch.save({"model_state_dict": model.decoder.state_dict()},
                 f"./checkpoints/last_model_trained_{i}.pt")
         print("")
 

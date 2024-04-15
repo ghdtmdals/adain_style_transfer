@@ -4,15 +4,19 @@ sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 
 import torch
 from torch import nn
-from models.vgg import VGGEncoder, VGGDecoder
+from models.vgg import VGGEncoder, VGGDecoder, VGGEncoderV2
 
 from utils.utils import get_mean_std
 
 class AdaINTransfer(nn.Module):
-    def __init__(self, add_bn: bool = False):
+    def __init__(self, add_bn: bool = False, opensrc_pretrained = True):
         super().__init__()
-        self.add_bn = add_bn
-        self.encoder = VGGEncoder(add_bn = self.add_bn)
+        self.opensrc_pretrained = opensrc_pretrained
+        if self.opensrc_pretrained:
+            self.encoder = VGGEncoderV2("./models/vgg_normalised.pth")
+        else:
+            self.add_bn = add_bn
+            self.encoder = VGGEncoder(add_bn = self.add_bn)
         self.decoder = VGGDecoder(add_bn = False)
     
     def adain(self, content_features, style_features):
@@ -31,25 +35,32 @@ class AdaINTransfer(nn.Module):
 
         return style_adapted
     
-    def forward(self, content, style):
-        content = self.encoder(content)
+    def forward(self, content, style, alpha = 1.0):
+        multiscale_content = self.forward_for_multiscale(content)
+        content = multiscale_content[-1]
         multiscale_style = self.forward_for_multiscale(style)
 
         ### style_adapted == notation t from paper for Content Feature Target
         style_adapted = self.adain(content, multiscale_style[-1])
+        style_adapted = style_adapted * alpha + content * (1 - alpha)
 
         output = self.decoder(style_adapted)
         ### Pass Output Back to the Encoder
         multiscale_outputs = self.forward_for_multiscale(output)
+        breakpoint()
 
         return multiscale_outputs, style_adapted, multiscale_style
 
     def forward_for_multiscale(self, x):
         ### 논문에서 언급한 세부 층의 출력을 활용해 Style Loss를 계산함
-        if self.add_bn:
-            layers = [3, 10, 17]
+        if self.opensrc_pretrained:
+            layers = [4, 11, 18, 31]
         else:
-            layers = [2, 7, 12]
+            if self.add_bn:
+                layers = [3, 10, 17, -1]
+            else:
+                layers = [2, 7, 12, -1]
+
         ### To relu 1-1
         relu1_1 = self.encoder.model[:layers[0]](x)
         ### To relu 2-1
@@ -57,14 +68,14 @@ class AdaINTransfer(nn.Module):
         ### To relu 3-1
         relu3_1 = self.encoder.model[layers[1]:layers[2]](relu2_1)
         ### To relu 4-1
-        relu4_1 = self.encoder.model[layers[2]:](relu3_1)
+        relu4_1 = self.encoder.model[layers[2]:layers[3]](relu3_1)
 
         return [relu1_1, relu2_1, relu3_1, relu4_1]
     
     def style_transfer(self, content, style, alpha = 1.0):
         ### Encode
-        content = self.encoder(content)
-        style = self.encoder(style)
+        content = self.forward_for_multiscale(content)[-1]
+        style = self.forward_for_multiscale(style)[-1]
 
         ### AdaIN
         style_adapted = self.adain(content, style)
@@ -76,7 +87,7 @@ class AdaINTransfer(nn.Module):
 
         return output
 
-# if __name__ == "__main__":
-#     model = AdaINTransfer(add_bn = True)
+if __name__ == "__main__":
+    model = AdaINTransfer(add_bn = False, opensrc_pretrained = True)
 
-#     breakpoint()
+    breakpoint()

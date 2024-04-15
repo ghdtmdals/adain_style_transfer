@@ -1,3 +1,4 @@
+import torch
 from torch import nn
 import torchvision.models as models
 
@@ -46,8 +47,6 @@ class VGGDecoder(nn.Module):
     def forward(self, x):
         x = self.model(x)
         return x
-    
-
 
 ### Encoder는 Pretrained 모델을 사용하기 위해 Pytorch VGG로 불러옴
 class VGGEncoder(nn.Module):
@@ -96,3 +95,39 @@ class VGGEncoder(nn.Module):
         out = self.model(x)
         
         return out
+
+class VGGEncoderV2(nn.Module):
+    def __init__(self, model_path):
+        super().__init__()
+        self.model = self.build_model()
+        self.model.load_state_dict(torch.load(model_path))
+        self.freeze_parameters()
+    
+    def build_model(self):
+        init_channels = 3
+        layers = [nn.Conv2d(in_channels = init_channels, out_channels = init_channels, kernel_size = 1)]
+        configs = [64, 64, 'm', 128, 128, 'm', 256, 256, 256, 256, 'm', 512, 512, 512, 512, 'm', 512, 512, 512, 512]
+
+        for config in configs:
+            if isinstance(config, int):
+                layers.append(nn.ReflectionPad2d((1, 1, 1, 1)))
+                layers.append(nn.Conv2d(init_channels, config, kernel_size = 3))
+                layers.append(nn.ReLU())
+                init_channels = config
+            
+            elif isinstance(config, str):
+                layers.append(nn.MaxPool2d(kernel_size = 2, stride = 2, ceil_mode = True))
+        
+        return nn.Sequential(*layers)
+    
+    def freeze_parameters(self):
+        ### Freeze Parameters
+        for param in self.model.parameters():
+            param.requires_grad_(False)
+        
+    def forward(self, x):
+        return self.model(x)
+
+if __name__ == "__main__":
+    encoder = VGGEncoderV2("./models/vgg_normalised.pth")
+    breakpoint()
