@@ -1,3 +1,4 @@
 checkpoints/
 trainingdata/
 dataset/
+models/vgg_normalised.pth
