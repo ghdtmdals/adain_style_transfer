@@ -31,6 +31,7 @@ class Train:
     def load_data(self, batch_size, n_workers):
         transform = transforms.Compose([
             # transforms.Resize((256, 256)), ### Image Size from Paper
+            ### 논문에서 언급된 처리 방식: 512로 Resize 후 Random Crop 수행해서 256으로 이미지 크기 맞춤
             transforms.Resize((512, 512)),
             transforms.RandomCrop(256),
             transforms.ToTensor(),

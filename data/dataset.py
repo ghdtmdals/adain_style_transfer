@@ -19,6 +19,7 @@ class ImageDataset(Dataset):
         return image
 
     def load_data(self):
+        ### 폴더 내 파일 경로를 읽어옴
         all_files = os.listdir(self.data_path)
         all_paths = []
         for path in all_files:
